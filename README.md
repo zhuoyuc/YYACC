@@ -4,45 +4,45 @@ Yet Yet Another Compiler Compiler
 
 ---
 
-# Construction of Compiler Framework and a PL/0 Language Interpreter Implementation
+# Construction of a Compiler Framework and an Implementation of a PL/0 Language Interpreter
 
-## Regex for tokens
+## Regular expressions for tokens
 
-- number：`[0-9][0-9]*`
-- Identifier：`[_a-zA-Z][_a-zA-Z0-9]*`
-- assignment synbol：`\:\=`
-- less than or equal to：`\<\=`
-- greater than or equal to：`\>\=`
-- other symbols：`[!?:;.,#<=>+-\*/\(\)]`
-- comment：`\{[\f\n\r\t\v -z|~]*\}`
-- white space chars：`[ \f\n\r\t\v][ \f\n\r\t\v]*`
+- number: `[0-9][0-9]*`
+- identifier: `[_a-zA-Z][_a-zA-Z0-9]*`
+- assignment symbol: `\:\=`
+- less than or equal to: `\<\=`
+- greater than or equal to: `\>\=`
+- other symbols: `[!?:;.,#<=>+-\*/\(\)]`
+- comment: `\{[\f\n\r\t\v -z|~]*\}`
+- whitespace characters: `[ \f\n\r\t\v][ \f\n\r\t\v]*`
 
 ## Automaton architecture
 
-A automaton can be represented by a 5-element tuple $(Q,\Sigma,\delta,q _ 0,F)$.
+An automaton can be represented by a 5-tuple $(Q,\Sigma,\delta,q _ 0,F)$.
 
-- $Q$ is state set
-- $\Sigma$ is char set
-- $\delta(q,c)$ is dual transition function
-  - the state-set reached from state-q through transition by char-c
-- the initial state is $q _ 0$, and final(termination) state-set is $F$
+- $Q$ is the set of states
+- $\Sigma$ is the alphabet
+- $\delta(q,c)$ is the transition function
+  - the set of states reached from state $q$ by the character $c$
+- the initial state is $q _ 0$, and the set of final (accepting) states is $F$
 
-For simpleicity, we note $\hat\delta(q,cw)=\hat\delta(\delta(q,c),w),(w \in \Sigma^*)$.
+For simplicity, we write $\hat\delta(q,cw)=\hat\delta(\delta(q,c),w),(w \in \Sigma^*)$.
 
-It is easy to observe that both DFA and NFA belong to automata, but their transition functions have different definitions(NFA is `vector<vector<set<int>>>`, DFA is `vector<vector<int>>`).
+It is easy to see that both DFA and NFA are automata, but their transition functions are defined differently (NFA is `vector<vector<set<int>>>`, while DFA is `vector<vector<int>>`).
 
-Consider using template classes for different types of inheritance.
+Template classes can be used to support different inheritance types.
 
 ``` cpp
 template<typename T_Delta, typename T_F, typename T_isend>
 class Automachine {
 public:
-    int Q;         // node count (index from 1)
+    int Q;         // node count (index starts from 1)
     int Sigma;     // alphabet size
     T_Delta Delta; // δ(q,w)
-    int q0;        // start state(node)
-    T_F F;         // final state
-    T_isend isend; // setted if is at final state
+    int q0;        // start state (node)
+    T_F F;         // final states
+    T_isend isend; // set if the current state is final
     Automachine() {}
     Automachine(int Q, int Sigma, T_Delta Delta, int q0, T_F F, T_isend isend):
         Q(Q), Sigma(Sigma), Delta(Delta), q0(q0), F(F), isend(isend) {};
@@ -51,64 +51,64 @@ class NFA: private Automachine<NFA_Delta, NFA_F, NFA_isend>; // NFA = (Q, Σ, δ
 class DFA: private Automachine<DFA_Delta, DFA_F, DFA_isend>; // DFA = (Q, Σ, δ, q0, F)
 ```
 
-### Termination state from Regex to ε- NFA (Thompson Construction Method)
+### From regular expressions to ε-NFA accepting states (Thompson construction)
 
-By using the following transformation, regular expressions can be constructed into equivalent ε-NFA.
+Using the following transformations, a regular expression can be constructed into an equivalent ε-NFA.
 
 - empty expression `ε`:
   ![inline](img/278px-Thompson-epsilon.svg.png)
 - single symbol `a`:
   ![inline](img/Thompson-a-symbol.svg.png)
-- the union of expressions `(s|t)`
+- union of expressions `(s|t)`
   ![inline](img/Thompson-or.svg.png)
-- the link of two expressions `(st)`:
+- concatenation of two expressions `(st)`:
   ![inline](img/Thompson-concat.svg.png)
-- the Kleen closure `(s*)`:
+- Kleene closure `(s*)`:
   ![inline](img/503px-Thompson-kleene-star.svg.png)
 
-### From ε-NFA to NFA (remove ε)
+### From ε-NFA to NFA (removing ε)
 
-Let $\epsilon(q)=\set{p|\hat \delta(q,\varepsilon)=p}$ to represent the state-set reached by ε-edge from state-q.
+Let $\epsilon(q)=\set{p|\hat \delta(q,\varepsilon)=p}$ denote the set of states reachable from state $q$ through ε-transitions.
 
 Therefore, $\forall c \in \Sigma,\delta_{NFA}(E(q),c)=\set{\cup_{p \in S} E(p)|S=\set{r|\delta(q,c)=r} }$.
 
-In fact, it is to represent the process of simulating ε-NFA with a simplified state set.
+In essence, this represents the process of simulating an ε-NFA with a simplified state set.
 
-### From NFA to DFA (determine NFA)
+### From NFA to DFA (determinization of NFA)
 
-We use subset construction method.
+We use the subset construction method.
 
-Similar to the step of simplify ε-NFA, we note $\Gamma _ c(q)= \set{ p|\delta(q,c)=p }$.
+Similar to the simplification step for ε-NFA, we write $\Gamma _ c(q)= \set{ p|\delta(q,c)=p }$.
 
-Then the DFA is designed like this: initial state is $\set{ q _ 0 }$, transition function is $\delta_{DFA}(S,c)=\cup_{p \in S} \Gamma_c(p)$.
+Then the DFA is constructed as follows: the initial state is $\set{ q _ 0 }$, and the transition function is $\delta_{DFA}(S,c)=\cup_{p \in S} \Gamma_c(p)$.
 
-It's important that:
+The following points are important:
 
-1. using hash algorithm to make mappings and it's also workable using `map<set<int>, int>`.
-2. determining NFA through subset construction method, it's based on BFS algorithm, which means using `queue<set<int>> que;` to restore state set S, and update it each time by taking the first element of the queue.
+1. a hash-based method can be used to build the mapping; `map<set<int>, int>` also works.
+2. NFA determinization through subset construction is based on BFS, which means using `queue<set<int>> que;` to store the state set $S$, and updating it each time by taking the first element from the queue.
 
-### From DFA to MFA (minimize DFA)
+### From DFA to MFA (minimizing DFA)
 
-最小化DFA有许多算法，这里选用比较直接的**填表算法**。
+There are many algorithms for DFA minimization. Here, the relatively direct **table-filling algorithm** is used.
 
-定义 $p,q$ 状态相同，当且仅当 $\forall w\in\Sigma^+,s.t.\hat \delta(p,w)=\hat \delta(q,w)$，换而言之：若 $\exists w \in \Sigma^+,s.t.\hat\delta(p,w) \ne \hat \delta(q,w)$，则 $p,q$ 状态不相同。
+States $p$ and $q$ are defined to be equivalent if and only if $\forall w\in\Sigma^+,s.t.\hat \delta(p,w)=\hat \delta(q,w)$. In other words, if $\exists w \in \Sigma^+,s.t.\hat\delta(p,w) \ne \hat \delta(q,w)$, then states $p$ and $q$ are not equivalent.
 
-首先，若 $p \in F,q \not \in F$，则 $p,q$ 不同；其次，若 $\delta(p,c)=p',\delta(q,c)=q'$ 且 $p',q'$ 不同，则 $p,q$ 不同；同时，若 $p,q$ 不同，则存在串 $w$，使得 $\hat\delta(p,w) \in F,\hat\delta(q,w)\not\in F$ 或相反。
+First, if $p \in F,q \not \in F$, then $p$ and $q$ are different. Second, if $\delta(p,c)=p',\delta(q,c)=q'$ and $p',q'$ are different, then $p$ and $q$ are different. At the same time, if $p$ and $q$ are different, then there exists a string $w$ such that $\hat\delta(p,w) \in F,\hat\delta(q,w)\not\in F$, or the reverse.
 
-所以可以再次使用广度优先搜索算法，初始时将所有满足 $p \in F,q \ne F$ 的 $(p,q)$ 点对加入队列，然后依次消除所有的不等价点对，最后剩下的点对就是所有的等价类。
+Therefore, BFS can be used again. Initially, all state pairs $(p,q)$ satisfying $p \in F,q \notin F$ are added to the queue. Then all inequivalent state pairs are eliminated one by one. The remaining state pairs form all equivalence classes.
 
-之后只需要删除所有的不可从初始节点到达的节点就可以转化为MFA了；为了更容易实现字符串匹配，这里可以稍微破坏DFA的结构，即将所有不能到达终止节点的节点删除。
+After that, it is only necessary to remove all states that are unreachable from the initial state to obtain the MFA. To simplify string matching, the DFA structure can be modified slightly here by removing all states that cannot reach any accepting state.
 
-### MFA匹配字符串
+### String matching with MFA
 
-这里的技术难点主要分为如何利用预编译好的**DFA进行字符串匹配**，以及如何优美的**读入绑定结构**。
+The main technical issues here are how to use a precompiled **DFA for string matching**, and how to **read the binding structure** in a clean way.
 
-线性扫描字符串的时候，依次使用每一个DFA进行贪心匹配。
+When scanning a string linearly, each DFA is used in turn for greedy matching.
 
 ``` cpp
 void match(string str) {
     int len = str.length(), ptr = 0;
-    while(ptr < len) { // analyse raw code
+    while(ptr < len) { // analyze the raw code
         walka(&hk, hooks) {
             auto &raw = get<0>(hk);
             auto &act = get<1>(hk);
@@ -119,7 +119,7 @@ void match(string str) {
                 isendstate = dfa.feed(str[ptr]);
                 raw += str[ptr ++];
             }
-            if(isendstate) { // state in `endF`, and we catched a string!
+            if(isendstate) { // state is in `endF`, and we matched a string
                 act(raw);
                 goto nxt;
             } else {
@@ -132,7 +132,7 @@ void match(string str) {
 }
 ```
 
-对于绑定匹配模式和匹配回调函数，这里通过 `Lexer& f() { return *this; }` 的方法，实现连续调用。
+For binding matching patterns and callback functions, the method `Lexer& f() { return *this; }` is used here to support chained calls.
 
 ``` cpp
 lexer.feed("[0-9][0-9]*",
@@ -147,9 +147,9 @@ lexer.feed("[0-9][0-9]*",
           });
 ```
 
-## 设计LL(1)文法
+## Design of the LL(1) grammar
 
-这里先给出EBNF范式的PL/0文法：
+First, the PL/0 grammar in EBNF form is given below:
 
 ``` pascal
 program = block "." ;
@@ -168,9 +168,9 @@ term = factor {("*"|"/") factor};
 factor = ident | number | "(" expression ")";
 ```
 
-由于Parser部分使用RDP实现，所以只需要去除**左递归**即可（不一定需要完全达到LL(1)），只需要增加后缀部分拆分左递归式。
+Since the parser is implemented with RDP, it is only necessary to eliminate **left recursion** (it does not have to fully satisfy LL(1)). This only requires adding suffix parts to split left-recursive productions.
 
-原始版本的PL/0对负数支持不太好，这里重写了部分定义。
+The original version of PL/0 does not handle negative numbers very well, so some definitions are rewritten here.
 
 ``` pascal
 <program> = <block> "."
@@ -224,15 +224,15 @@ factor = ident | number | "(" expression ")";
 <number> = `NUMBER`
 ```
 
-如何处理带符号表达式是这部分的主要难点，诸如 `-114` 或者 `+514` 之类的数字，又或者说是 `-homo` 这类的变量，再或者说是 `+(1919/810)` 这类的表达式前的符号。可以考虑将它们都归结到 `<factor>` 中实现，即增加前缀符号识别。
+The main difficulty in this part is how to handle signed expressions, such as numbers like `-114` or `+514`, variables like `-homo`, or a leading sign before an expression such as `+(1919/810)`. A practical approach is to reduce all of them to `<factor>`, that is, to add prefix-sign recognition.
 
-## 解析抽象语法树
+## Parsing the abstract syntax tree
 
-这里使用的是**递归下降子程序法**解析抽象语法树，大体思路就是，通过递归函数栈来模拟匹配文法。
+The **recursive descent procedure method** is used here to parse the abstract syntax tree. The basic idea is to simulate grammar matching through the recursive function stack.
 
-通过构造抽象转移图的方式存储CFG格式，进而模拟进行递归下降子程序法进行解析。
+The CFG is stored by constructing an abstract transition graph, and then recursive descent parsing is simulated on top of it.
 
-通过宏定义，将中间节点和终止节点的使用变得容易；Node通过返回自身地址，实现连续操作。
+Through macro definitions, the use of intermediate nodes and terminal nodes becomes easier. A `Node` returns its own address so that chained operations can be written directly.
 
 ``` cpp
 #define T(val) (parser.getTerminalNode(val))      // Terminal
@@ -246,27 +246,27 @@ N(statement) -> add({ N(ident), T(":="), N(expression) })
     -> add({ T("while"), N(condition), T("do"), N(statement) });
 ```
 
-## 设计汇编原型与编译模式
+## Design of the assembly prototype and compilation scheme
 
-首先设计基础汇编指令，一共分为 $16$ 个基础指令，依次表示数据入栈、将栈顶数据弹出到变量、条件跳转、四则运算、条件判断（`odd` 表示判断是否是奇数，`#` 表示不等于）、控制台输入（`?`）和控制台输出（`!`）。
+First, a basic assembly instruction set is designed. It contains a total of $16$ basic instructions, which represent stack push, popping the top stack value into a variable, conditional jump, the four arithmetic operations, conditional tests (`odd` means checking whether a value is odd, and `#` means inequality), console input (`?`), and console output (`!`).
 
 ``` text
 push, pop, jff, +, -, *, /, odd, =, #, <, <=, >, >=, ?, !
 ```
 
-- `push x` 会将立即数 $x$ 压入栈顶，`push @x` 会将变量 `@x` 的值压入栈顶。
-- `pop @x` 会将栈顶元素弹出，并赋值给变量 `@x`。
-- `jff label` 会先弹出栈顶元素，如果栈顶元素为 $0$，则跳转到位置 `label`。 
-- `+, -, *, /, =, #, <, <=, >, >=` 会弹出栈顶两个元素 $x_1,x_2$，然后将 $x_1 \oplus x_2$ 压入栈顶。
-- `odd` 会弹出栈顶元素 $x$，如果 $x$ 是奇数，则压入 $1$，否则压入 $0$。
-- `?` 会从控制台读入一个整数（int类型），并压入栈顶。
-- `!` 会弹出栈顶元素并将其输出。
+- `push x` pushes the immediate value $x$ onto the top of the stack, and `push @x` pushes the value of variable `@x` onto the stack.
+- `pop @x` pops the top element of the stack and assigns it to variable `@x`.
+- `jff label` first pops the top stack element; if that value is $0$, execution jumps to `label`. 
+- `+, -, *, /, =, #, <, <=, >, >=` pop the top two stack elements $x_1,x_2$, then push $x_1 \oplus x_2$ onto the stack.
+- `odd` pops the top stack element $x$; if $x$ is odd, it pushes $1$, otherwise it pushes $0$.
+- `?` reads an integer (type `int`) from the console and pushes it onto the stack.
+- `!` pops the top stack element and outputs it.
 
-以下是详细的编译模式。
+The detailed compilation scheme is shown below.
 
 ``` pascal
-"const" <ident> "=" <number> <constdefpri> ";"  {  }  // 这部分在编译部分直接进行变量替换
-"var" <ident> <vardefpri> ";" { push @@__stack_top; push <vert_ident>; +; pop @@__stack_top; } // 间接填充
+"const" <ident> "=" <number> <constdefpri> ";"  {  }  // this part performs direct variable substitution during compilation
+"var" <ident> <vardefpri> ";" { push @@__stack_top; push <vert_ident>; +; pop @@__stack_top; } // indirect filling
 "procedure" <ident> ";" <constdef> <vardef> <statement> ";" <procdef>
 {
     push 0;
@@ -292,10 +292,10 @@ push, pop, jff, +, -, *, /, odd, =, #, <, <=, >, >=, ?, !
 }
 <ident> ":=" <expression>  { <expression>; pop @<ident>; }
 "call" <ident>    { push @@__ptr; push 4; +; push 0; jff &<ident>; }
-"?" <ident>       { ?; pop @<ident>; }  // ?读入到栈顶,复用pop
-"!" <expression>  { <expression>; !; }  // !输出栈顶并弹出,复用<expression>
+"?" <ident>       { ?; pop @<ident>; }  // ? reads into the stack top and reuses pop
+"!" <expression>  { <expression>; !; }  // ! outputs and pops the stack top, reusing <expression>
 "begin" <statement> <statementpri> "end"  { <statement> }
-"if" <condition> "then" <statement>       { <condition>; jff nxt; <statement>; nxt:; } // 如果<condition>为false则跳转(jump if false)
+"if" <condition> "then" <statement>       { <condition>; jff nxt; <statement>; nxt:; } // jump if <condition> is false
 "while" <condition> "do" <statement>      { beg:; <condition>; jff nxt; <statement>; push 0; jff beg; nxt:; }
 "odd" <expression>                { <expression>; odd; }
 <expression> "="  <expression>    { <expression1>; <expression2>; =; }
@@ -304,13 +304,13 @@ push, pop, jff, +, -, *, /, odd, =, #, <, <=, >, >=, ?, !
 <expression> "<=" <expression>    { <expression1>; <expression2>; <=; }
 <expression> ">"  <expression>    { <expression1>; <expression2>; >; }
 <expression> ">=" <expression>    { <expression1>; <expression2>; >=; }
-"+" <term> <expressionpri>    { <factor1>; <factor2>; +; }  // 弹出栈顶f1,f2,之后计算f1+f2并放入栈顶
-"-" <term> <expressionpri>    { <factor1>; <factor2>; -; }  // 弹出栈顶f1,f2,之后计算f1-f2并放入栈顶
-"*" <factor> <termpri>  { <factor1>; <factor2>; *; }  // 弹出栈顶f1,f2,之后计算f1*f2并放入栈顶
-"/" <factor> <termpri>  { <factor1>; <factor2>; /; }  // 弹出栈顶f1,f2,之后计算f1/f2并放入栈顶
+"+" <term> <expressionpri>    { <factor1>; <factor2>; +; }  // pop f1 and f2 from the stack top, then compute f1+f2 and push the result
+"-" <term> <expressionpri>    { <factor1>; <factor2>; -; }  // pop f1 and f2 from the stack top, then compute f1-f2 and push the result
+"*" <factor> <termpri>  { <factor1>; <factor2>; *; }  // pop f1 and f2 from the stack top, then compute f1*f2 and push the result
+"/" <factor> <termpri>  { <factor1>; <factor2>; /; }  // pop f1 and f2 from the stack top, then compute f1/f2 and push the result
 <ident>   { push @<ident> }
 <number>  { push <number> }
-"(" <expression> ")"  { <expression> } // <expression>在计算结束后会把值放入栈顶
+"(" <expression> ")"  { <expression> } // after evaluation, <expression> leaves its value on the stack top
 "+" "(" <expression> ")" { <expression> }
 "-" "(" <expression> ")" { push 0; <expression>; -; }
 "+" <number> { push <number>; }
@@ -319,23 +319,23 @@ push, pop, jff, +, -, *, /, odd, =, #, <, <=, >, >=, ?, !
 "-" <ident>  { push 0; push @<ident>; -; }
 ```
 
-## 字节码的处理与执行
+## Processing and execution of bytecode
 
-首先通过上述编译模式进行逐行翻译，获得汇编码；同样方式可以获得字节码。在编译完成后，通过虚拟机进行执行（这里用单栈机实现）。
+First, line-by-line translation is performed according to the compilation scheme above to obtain assembly code; bytecode can be obtained in the same way. After compilation is completed, execution is performed through a virtual machine (implemented here as a single-stack machine).
 
 ``` cpp
 if(nd -> astchild[0] -> val == "if") {
     // if <condition> do <statement>
-    auto nxt = 0; // need to modify
+    auto nxt = 0; // needs to be modified
     dfs(nd -> astchild[1]);
     auto idx = opcode.size();
-    opcode.add(Opcode :: bc_jff(nxt)); // need to modify
+    opcode.add(Opcode :: bc_jff(nxt)); // needs to be modified
     dfs(nd -> astchild[3]);
-    opcode.modify(idx, Opcode :: bc_jff(opcode.size())); // here, rewrite `nxt` address
+    opcode.modify(idx, Opcode :: bc_jff(opcode.size())); // rewrite the `nxt` address here
 }
 ```
 
-## 结果展示
+## Results
 
 <center>
     <img style="border-radius: 0.3125em;
@@ -360,7 +360,7 @@ if(nd -> astchild[0] -> val == "if") {
 </center>
 
 
-## 参考资料
+## References
 
 - [1] [wikipedia-Regular language](https://en.wikipedia.org/wiki/Regular_language)
 - [2] [wikipedia-Nondeterministic finite automaton](https://en.wikipedia.org/wiki/Nondeterministic_finite_automaton)
